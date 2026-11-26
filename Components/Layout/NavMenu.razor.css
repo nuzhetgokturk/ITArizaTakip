@@ -1,0 +1,98 @@
+
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 3.5rem;
+    height: 2.5rem;
+    color: white;
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    border: 1px solid rgba(255,255,255,0.2);
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.navbar-toggler:checked {
+    background-color: rgba(255,255,255,0.25);
+}
+
+.top-row {
+    min-height: 4rem;
+    background: linear-gradient(135deg, #101d35, #172d50);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.navbar-brand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #ffffff;
+}
+
+.bi {
+    display: inline-block;
+    position: relative;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.75rem;
+    top: -1px;
+    background-size: cover;
+}
+
+.nav-item {
+    font-size: 0.92rem;
+    padding: 0.25rem 0.8rem;
+}
+
+.nav-item:first-of-type {
+    padding-top: 1rem;
+}
+
+.nav-item:last-of-type {
+    padding-bottom: 1rem;
+}
+
+.nav-item ::deep .nav-link {
+    color: #cbd5e1;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.nav-item ::deep a.active {
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+}
+
+.nav-item ::deep .nav-link:hover {
+    background-color: rgba(59,130,246,0.18);
+    color: #ffffff;
+    transform: translateX(3px);
+}
+
+.nav-scrollable {
+    display: none;
+    background: linear-gradient(180deg, #172d50, #101d35);
+}
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        display: block;
+        height: calc(100vh - 4rem);
+        overflow-y: auto;
+    }
+}

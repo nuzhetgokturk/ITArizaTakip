@@ -1,0 +1,240 @@
+
+@page "/personel-yonetimi"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici")]
+
+@using ITArizaTakip.Data
+@using ITArizaTakip.Services
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.JSInterop
+
+@inject PersonelService PersonelService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Personel Yönetimi</PageTitle>
+
+<h3>Personel Yönetimi</h3>
+
+<p>Personelleri ekleyebilir, düzenleyebilir ve pasife alabilirsiniz.</p>
+
+@if (!string.IsNullOrWhiteSpace(mesaj))
+{
+    <div class="alert alert-info">@mesaj</div>
+}
+
+<div class="card p-3 mb-4">
+    <h5>@(duzenlemeModu ? "Personel Bilgilerini Düzenle" : "Yeni Personel Ekle")</h5>
+
+    <div class="mb-3">
+        <label class="form-label">Ad Soyad</label>
+        <input class="form-control" @bind="adSoyad" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">E-posta</label>
+        <input class="form-control" type="email" @bind="email" />
+    </div>
+
+    @if (!duzenlemeModu)
+    {
+        <div class="mb-3">
+            <label class="form-label">Şifre</label>
+            <input class="form-control" type="password" @bind="sifre" />
+        </div>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Departman</label>
+        <select class="form-select" @bind="departmanId">
+            <option value="">Departman seçiniz</option>
+            @foreach (var departman in departmanlar)
+            {
+                <option value="@departman.Id">@departman.Ad</option>
+            }
+        </select>
+    </div>
+
+    <button class="btn btn-primary"
+            @onclick="PersonelKaydet"
+            disabled="@islemDevamEdiyor">
+        @(duzenlemeModu ? "Değişiklikleri Kaydet" : "Personel Ekle")
+    </button>
+
+    @if (duzenlemeModu)
+    {
+        <button class="btn btn-secondary mt-2"
+                @onclick="FormuTemizle">
+            Vazgeç
+        </button>
+    }
+</div>
+
+<h5>Personel Listesi</h5>
+
+@if (personeller == null)
+{
+    <p>Personeller yükleniyor...</p>
+}
+else if (personeller.Count == 0)
+{
+    <p>Henüz aktif personel bulunmuyor.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Ad Soyad</th>
+                    <th>E-posta</th>
+                    <th>Departman</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var personel in personeller)
+                {
+                    <tr>
+                        <td>@personel.AdSoyad</td>
+                        <td>@personel.Email</td>
+                        <td>
+                            @(departmanlar.FirstOrDefault(d => d.Id == personel.DepartmanId)?.Ad ?? "Atanmamış")
+                        </td>
+                        <td>
+                            <button class="btn btn-warning btn-sm"
+                                    @onclick="() => PersonelDuzenle(personel)">
+                                Düzenle
+                            </button>
+
+                            <button class="btn btn-danger btn-sm ms-1"
+                                    @onclick="() => PersonelPasifeAl(personel.Id)">
+                                Pasife Al
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<ApplicationUser> personeller = new();
+    private List<Departman> departmanlar = new();
+
+    private string adSoyad = "";
+    private string email = "";
+    private string sifre = "";
+    private int? departmanId;
+
+    private string? duzenlenenPersonelId;
+    private string mesaj = "";
+    private bool duzenlemeModu = false;
+    private bool islemDevamEdiyor = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await VerileriGetir();
+    }
+
+    private async Task VerileriGetir()
+    {
+        personeller = await PersonelService.PersonelleriGetirAsync();
+        departmanlar = await PersonelService.DepartmanlariGetirAsync();
+    }
+
+    private async Task PersonelKaydet()
+    {
+        if (islemDevamEdiyor)
+            return;
+
+        islemDevamEdiyor = true;
+
+        try
+        {
+            IdentityResult sonuc;
+
+            if (duzenlemeModu)
+            {
+                sonuc = await PersonelService.PersonelGuncelleAsync(
+                    duzenlenenPersonelId!,
+                    adSoyad,
+                    email,
+                    departmanId
+                );
+            }
+            else
+            {
+                sonuc = await PersonelService.PersonelEkleAsync(
+                    adSoyad,
+                    email,
+                    sifre,
+                    departmanId
+                );
+            }
+
+            if (sonuc.Succeeded)
+            {
+                mesaj = duzenlemeModu
+                    ? "Personel bilgileri güncellendi."
+                    : "Yeni personel başarıyla eklendi.";
+
+                FormuTemizle();
+                await VerileriGetir();
+            }
+            else
+            {
+                mesaj = string.Join(" ", sonuc.Errors.Select(e => e.Description));
+            }
+        }
+        finally
+        {
+            islemDevamEdiyor = false;
+        }
+    }
+
+    private void PersonelDuzenle(ApplicationUser personel)
+    {
+        duzenlemeModu = true;
+        duzenlenenPersonelId = personel.Id;
+
+        adSoyad = personel.AdSoyad;
+        email = personel.Email ?? "";
+        departmanId = personel.DepartmanId;
+
+        mesaj = "";
+    }
+
+    private async Task PersonelPasifeAl(string id)
+    {
+        bool onay = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            "Bu personeli pasife almak istediğinizden emin misiniz?"
+        );
+
+        if (!onay)
+            return;
+
+        var sonuc = await PersonelService.PersonelPasifeAlAsync(id);
+
+        if (sonuc.Succeeded)
+        {
+            mesaj = "Personel pasife alındı.";
+            FormuTemizle();
+            await VerileriGetir();
+        }
+        else
+        {
+            mesaj = string.Join(" ", sonuc.Errors.Select(e => e.Description));
+        }
+    }
+
+    private void FormuTemizle()
+    {
+        adSoyad = "";
+        email = "";
+        sifre = "";
+        departmanId = null;
+        duzenlenenPersonelId = null;
+        duzenlemeModu = false;
+    }
+}

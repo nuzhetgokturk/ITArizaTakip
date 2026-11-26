@@ -1,0 +1,296 @@
+
+@page "/departman-yonetimi"
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici")]
+
+@using ITArizaTakip.Data
+@using ITArizaTakip.Services
+
+@inject PersonelService PersonelService
+
+<PageTitle>Departman Yönetimi</PageTitle>
+
+<div class="departman-container">
+
+    <div class="sayfa-baslik">
+        <div>
+            <h2>Departman Yönetimi</h2>
+            <p>Departmanları ekleyebilir, düzenleyebilir ve yönetebilirsiniz.</p>
+        </div>
+    </div>
+
+    <div class="departman-kart">
+
+        <h4>@(duzenlemeModu ? "Departman Düzenle" : "Yeni Departman Ekle")</h4>
+
+        <div class="form-grup">
+            <label>Departman Adı</label>
+            <input class="form-control"
+                   @bind="departmanAdi"
+                   placeholder="Örn: Bilgi İşlem" />
+        </div>
+
+        <div class="form-grup">
+            <label>Açıklama</label>
+            <textarea class="form-control"
+                      @bind="departmanAciklama"
+                      rows="3"
+                      placeholder="Departman açıklaması"></textarea>
+        </div>
+
+        <div class="buton-grup">
+            <button class="btn btn-primary"
+                    @onclick="Kaydet">
+                @(duzenlemeModu ? "Güncelle" : "Departman Ekle")
+            </button>
+
+            @if (duzenlemeModu)
+            {
+                <button class="btn btn-secondary"
+                        @onclick="FormuTemizle">
+                    Vazgeç
+                </button>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(mesaj))
+        {
+            <div class="alert @(islemBasarili ? "alert-success" : "alert-danger")">
+                @mesaj
+            </div>
+        }
+
+    </div>
+
+    <div class="departman-kart">
+
+        <h4>Departman Listesi</h4>
+
+        @if (departmanlar == null)
+        {
+            <p>Departmanlar yükleniyor...</p>
+        }
+        else if (departmanlar.Count == 0)
+        {
+            <p>Kayıtlı departman bulunamadı.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+
+                    <thead>
+                        <tr>
+                            <th>Departman Adı</th>
+                            <th>Açıklama</th>
+                            <th>Durum</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var departman in departmanlar)
+                        {
+                            <tr>
+                                <td>@departman.Ad</td>
+                                <td>@(departman.Aciklama ?? "-")</td>
+                                <td>
+                                    @if (departman.AktifMi)
+                                    {
+                                        <span class="badge bg-success">Aktif</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Pasif</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (departman.AktifMi)
+                                    {
+                                        <button class="btn btn-sm btn-warning me-1"
+                                                @onclick="() => Duzenle(departman)">
+                                            Düzenle
+                                        </button>
+
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => PasifeAl(departman.Id)">
+                                            Pasife Al
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+
+                </table>
+            </div>
+        }
+
+    </div>
+
+</div>
+
+<style>
+    .departman-container {
+        padding: 25px;
+    }
+
+    .sayfa-baslik {
+        margin-bottom: 25px;
+    }
+
+    .sayfa-baslik h2 {
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .sayfa-baslik p {
+        color: #6c757d;
+    }
+
+    .departman-kart {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+
+    .departman-kart h4 {
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    .form-grup {
+        margin-bottom: 18px;
+    }
+
+    .form-grup label {
+        display: block;
+        margin-bottom: 7px;
+        font-weight: 600;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 7px;
+    }
+
+    .buton-grup {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .table th,
+    .table td {
+        vertical-align: middle;
+    }
+</style>
+
+@code {
+    private List<Departman>? departmanlar;
+
+    private string departmanAdi = "";
+    private string departmanAciklama = "";
+
+    private int? duzenlenenDepartmanId;
+
+    private bool duzenlemeModu = false;
+    private bool islemBasarili = false;
+
+    private string mesaj = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ListeyiYukle();
+    }
+
+    private async Task ListeyiYukle()
+    {
+        departmanlar = await PersonelService.TumDepartmanlariGetirAsync();
+    }
+
+    private async Task Kaydet()
+    {
+        mesaj = "";
+
+        if (string.IsNullOrWhiteSpace(departmanAdi))
+        {
+            islemBasarili = false;
+            mesaj = "Departman adı zorunludur.";
+            return;
+        }
+
+        if (duzenlemeModu && duzenlenenDepartmanId.HasValue)
+        {
+            var sonuc = await PersonelService.DepartmanGuncelleAsync(
+                duzenlenenDepartmanId.Value,
+                departmanAdi,
+                departmanAciklama
+            );
+
+            islemBasarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+        }
+        else
+        {
+            var sonuc = await PersonelService.DepartmanEkleAsync(
+                departmanAdi,
+                departmanAciklama
+            );
+
+            islemBasarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+        }
+
+        if (islemBasarili)
+        {
+            FormuTemizle();
+            await ListeyiYukle();
+        }
+    }
+
+    private void Duzenle(Departman departman)
+    {
+        duzenlemeModu = true;
+        duzenlenenDepartmanId = departman.Id;
+        departmanAdi = departman.Ad;
+        departmanAciklama = departman.Aciklama ?? "";
+        mesaj = "";
+    }
+
+    private async Task PasifeAl(int id)
+    {
+        bool onay = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Bu departmanı pasife almak istediğinize emin misiniz?"
+        );
+
+        if (!onay)
+            return;
+
+        var sonuc = await PersonelService.DepartmanPasifeAlAsync(id);
+
+        islemBasarili = sonuc.Basarili;
+        mesaj = sonuc.Mesaj;
+
+        await ListeyiYukle();
+
+        if (duzenlenenDepartmanId == id)
+            FormuTemizle();
+    }
+
+    private void FormuTemizle()
+    {
+        duzenlemeModu = false;
+        duzenlenenDepartmanId = null;
+        departmanAdi = "";
+        departmanAciklama = "";
+    }
+
+    [Inject]
+    private Microsoft.JSInterop.IJSRuntime JS { get; set; } = default!;
+}

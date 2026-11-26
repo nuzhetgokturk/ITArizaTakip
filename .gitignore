@@ -1,0 +1,20 @@
+# Derleme dosyaları
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Veritabanı bağlantı bilgileri
+appsettings.json
+appsettings.Development.json
+
+# Veritabanı yedekleri
+*.backup
+*.bak
+
+# Gizli dosyalar
+.env
+.env.*

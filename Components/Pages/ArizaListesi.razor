@@ -1,0 +1,748 @@
+
+@page "/ariza-listesi"
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici,Personel")]
+
+@using ITArizaTakip.Data
+@using ITArizaTakip.Services
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using System.Linq
+
+@inject ArizaService ArizaService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Arıza Listesi</PageTitle>
+
+<div class="list-header">
+    <div>
+        <h3>IT Arıza Listesi</h3>
+        <p>Arıza kayıtlarını görüntüleyin ve takip edin.</p>
+    </div>
+
+    <a href="/ariza-kayit" class="btn btn-primary">
+        + Yeni Arıza Kaydı
+    </a>
+</div>
+
+<div class="list-summary">
+    <div class="summary-item">
+        <span>Görüntülenen Kayıt</span>
+        <strong>@(arizalar?.Count ?? 0)</strong>
+    </div>
+
+    <div class="summary-item">
+        <span>Bekleyen</span>
+        <strong>@(arizalar?.Count(a => a.Durum == "Bekliyor") ?? 0)</strong>
+    </div>
+
+    <div class="summary-item">
+        <span>İşlemde</span>
+        <strong>@(arizalar?.Count(a => a.Durum == "İşlemde") ?? 0)</strong>
+    </div>
+
+    <div class="summary-item">
+        <span>Çözüldü</span>
+        <strong>@(arizalar?.Count(a => a.Durum == "Çözüldü") ?? 0)</strong>
+    </div>
+</div>
+
+<div class="list-card">
+
+    @if (arizalar == null)
+    {
+        <div class="empty-state">
+            <p>Arızalar yükleniyor...</p>
+        </div>
+    }
+    else if (arizalar.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h5>Henüz arıza kaydı bulunmuyor</h5>
+            <p>Yeni arıza kaydı oluşturarak başlayabilirsiniz.</p>
+
+            <a href="/ariza-kayit" class="btn btn-primary">
+                Arıza Kaydı Oluştur
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Talep Eden</th>
+                        <th>Departman</th>
+                        <th>Arıza Başlığı</th>
+                        <th>Açıklama</th>
+                        <th>Öncelik</th>
+                        <th>Durum</th>
+                        <th>Atanan Departman</th>
+                        <th>Atanan Personel</th>
+                        <th>Kayıt Tarihi</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var ariza in arizalar)
+                    {
+                        <tr>
+                            <td><strong>#@ariza.Id</strong></td>
+
+                            <td>@ariza.TalepEden</td>
+
+                            <td>@ariza.Departman</td>
+
+                            <td class="title-cell">
+                                @ariza.ArizaBasligi
+                            </td>
+
+                            <td class="description-cell">
+                                @ariza.Aciklama
+                            </td>
+
+                            <td>
+                                <span class="priority-badge @OncelikSinifi(ariza.Oncelik)">
+                                    @ariza.Oncelik
+                                </span>
+                            </td>
+
+                            <td>
+                                @if (yonetici)
+                                {
+                                    <select class="form-select status-select"
+                                            value="@ariza.Durum"
+                                            @onchange="(e) => DurumGuncelle(ariza, e.Value?.ToString())">
+
+                                        <option value="Bekliyor">Bekliyor</option>
+                                        <option value="İşlemde">İşlemde</option>
+                                        <option value="Çözüldü">Çözüldü</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <span class="status-badge @DurumSinifi(ariza.Durum)">
+                                        @ariza.Durum
+                                    </span>
+                                }
+                            </td>
+
+                            <td>
+                                @(ariza.AtananDepartman?.Ad ?? "Atanmadı")
+                            </td>
+
+                            <td>
+                                @(ariza.AtananPersonel?.AdSoyad ?? "Atanmadı")
+                            </td>
+
+                            <td class="date-cell">
+                                @ariza.KayitTarihi.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            </td>
+
+                            <td>
+                                <div class="action-buttons">
+
+                                    @if (yonetici)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success"
+                                                @onclick="() => AtamaEkraniniAc(ariza)">
+                                            Atama Yap
+                                        </button>
+                                    }
+
+                                    @if (IslemYapabilir(ariza))
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                @onclick="() => Duzenle(ariza)">
+                                            Düzenle
+                                        </button>
+
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => Sil(ariza)">
+                                            Sil
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(mesaj))
+    {
+        <div class="alert @(basarili ? "alert-success" : "alert-danger") mt-3 mb-0">
+            @mesaj
+        </div>
+    }
+
+</div>
+
+@if (atamaPenceresiAcik && seciliAriza != null)
+{
+    <div class="assignment-overlay">
+        <div class="assignment-card">
+
+            <h4>Arıza Atama</h4>
+
+            <p>
+                <strong>Arıza:</strong>
+                @seciliAriza.ArizaBasligi
+            </p>
+
+            @if (!string.IsNullOrEmpty(atamaMesaji))
+            {
+                <div class="alert alert-danger">
+                    @atamaMesaji
+                </div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Departman Seç</label>
+
+                <select class="form-select"
+                        @bind="seciliDepartmanId"
+                        @bind:after="DepartmanDegisti">
+
+                    <option value="">Departman seçiniz</option>
+
+                    @foreach (var departman in departmanlar)
+                    {
+                        <option value="@departman.Id">
+                            @departman.Ad
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Personel Seç</label>
+
+                <select class="form-select"
+                        @bind="seciliPersonelId"
+                        disabled="@(seciliDepartmanId == null)">
+
+                    <option value="">Personel seçiniz</option>
+
+                    @foreach (var personel in personeller.Where(
+                        p => p.DepartmanId == seciliDepartmanId))
+                    {
+                        <option value="@personel.Id">
+                            @personel.AdSoyad
+                        </option>
+                    }
+                </select>
+
+                @if (seciliDepartmanId != null &&
+                    !personeller.Any(p => p.DepartmanId == seciliDepartmanId))
+                {
+                    <small class="text-danger">
+                        Bu departmanda kayıtlı personel bulunamadı.
+                    </small>
+                }
+            </div>
+
+            <div class="assignment-buttons">
+                <button class="btn btn-success"
+                        @onclick="AtamayiKaydet"
+                        disabled="@atamaKaydediliyor">
+
+                    @(atamaKaydediliyor ? "Kaydediliyor..." : "Atamayı Kaydet")
+                </button>
+
+                <button class="btn btn-secondary"
+                        @onclick="AtamaEkraniniKapat"
+                        disabled="@atamaKaydediliyor">
+                    İptal
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+<style>
+    .list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
+
+    .list-header h3 {
+        color: #172d50;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .list-header p {
+        color: #64748b;
+        margin: 0;
+    }
+
+    .list-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .summary-item {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+    }
+
+    .summary-item span {
+        display: block;
+        color: #64748b;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .summary-item strong {
+        color: #172d50;
+        font-size: 27px;
+    }
+
+    .list-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04);
+    }
+
+    .table {
+        margin-bottom: 0;
+        min-width: 1450px;
+    }
+
+    .table thead th {
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 14px 12px;
+    }
+
+    .table tbody td {
+        color: #475569;
+        font-size: 13px;
+        padding: 14px 12px;
+        border-color: #edf1f6;
+    }
+
+    .table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .title-cell {
+        font-weight: 600;
+        color: #172d50 !important;
+    }
+
+    .description-cell {
+        max-width: 200px;
+        overflow-wrap: anywhere;
+    }
+
+    .date-cell {
+        white-space: nowrap;
+    }
+
+    .priority-badge,
+    .status-badge {
+        display: inline-block;
+        padding: 6px 11px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .priority-high {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .priority-medium {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .priority-low {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-progress {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .status-completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-select {
+        min-width: 115px;
+        font-size: 12px;
+        border-radius: 8px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .action-buttons button {
+        white-space: nowrap;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 55px 20px;
+        color: #64748b;
+    }
+
+    .empty-icon {
+        font-size: 38px;
+        margin-bottom: 12px;
+    }
+
+    .empty-state h5 {
+        color: #172d50;
+        font-weight: 700;
+    }
+
+    .empty-state p {
+        margin-bottom: 18px;
+    }
+
+    .assignment-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        z-index: 1000;
+    }
+
+    .assignment-card {
+        width: 100%;
+        max-width: 500px;
+        background: white;
+        border-radius: 14px;
+        padding: 28px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.2);
+    }
+
+    .assignment-card h4 {
+        color: #172d50;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+
+    .assignment-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    @@media (max-width: 768px) {
+        .list-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .list-header .btn {
+            width: 100%;
+        }
+
+        .assignment-buttons {
+            flex-direction: column;
+        }
+    }
+</style>
+
+@code {
+    private List<Ariza>? arizalar;
+    private List<Departman> departmanlar = new();
+    private List<ApplicationUser> personeller = new();
+
+    private string mesaj = "";
+    private bool basarili = false;
+    private bool yonetici = false;
+    private string? kullaniciId;
+
+    private bool atamaPenceresiAcik = false;
+    private bool atamaKaydediliyor = false;
+    private string atamaMesaji = "";
+
+    private Ariza? seciliAriza;
+    private int? seciliDepartmanId;
+    private string? seciliPersonelId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var durum = await AuthenticationStateProvider
+            .GetAuthenticationStateAsync();
+
+        var kullanici = durum.User;
+
+        yonetici = kullanici.IsInRole("Yönetici");
+
+        kullaniciId = kullanici.FindFirst(
+            ClaimTypes.NameIdentifier)?.Value;
+
+        await ListeyiYukle();
+    }
+
+    // Kullanıcı bu arızada işlem yapabilir mi?
+    private bool IslemYapabilir(Ariza ariza)
+    {
+        return yonetici ||
+            (!string.IsNullOrWhiteSpace(kullaniciId) &&
+             ariza.KullaniciId == kullaniciId);
+    }
+
+    // Arıza listesini yükle
+    private async Task ListeyiYukle()
+    {
+        try
+        {
+            arizalar = await ArizaService.ArizalariGetirAsync();
+        }
+        catch
+        {
+            arizalar = new List<Ariza>();
+            basarili = false;
+            mesaj = "Arıza kayıtları yüklenirken bir hata oluştu.";
+        }
+    }
+
+    // Öncelik renklerini belirle
+    private string OncelikSinifi(string oncelik)
+    {
+        return oncelik switch
+        {
+            "Yüksek" => "priority-high",
+            "Orta" => "priority-medium",
+            "Düşük" => "priority-low",
+            _ => ""
+        };
+    }
+
+    // Durum renklerini belirle
+    private string DurumSinifi(string durum)
+    {
+        return durum switch
+        {
+            "Bekliyor" => "status-pending",
+            "İşlemde" => "status-progress",
+            "Çözüldü" => "status-completed",
+            _ => ""
+        };
+    }
+
+    // Arıza durumunu güncelle
+    private async Task DurumGuncelle(Ariza ariza, string? yeniDurum)
+    {
+        if (!yonetici || string.IsNullOrWhiteSpace(yeniDurum))
+            return;
+
+        try
+        {
+            var sonuc = await ArizaService.DurumGuncelleAsync(
+                ariza.Id,
+                yeniDurum
+            );
+
+            basarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+
+            if (sonuc.Basarili)
+            {
+                ariza.Durum = yeniDurum;
+            }
+        }
+        catch
+        {
+            basarili = false;
+            mesaj = "Arıza durumu güncellenirken bir hata oluştu.";
+        }
+    }
+
+    // Atama penceresini aç
+    private async Task AtamaEkraniniAc(Ariza ariza)
+    {
+        if (!yonetici)
+            return;
+
+        try
+        {
+            seciliAriza = ariza;
+            atamaMesaji = "";
+
+            departmanlar = await ArizaService.DepartmanlariGetirAsync();
+            personeller = await ArizaService.PersonelleriGetirAsync();
+
+            seciliDepartmanId = ariza.AtananDepartmanId;
+            seciliPersonelId = ariza.AtananPersonelId;
+
+            atamaPenceresiAcik = true;
+        }
+        catch
+        {
+            mesaj = "Departman ve personel bilgileri yüklenemedi.";
+            basarili = false;
+        }
+    }
+
+    // Departman değiştiğinde önceki personel seçimini temizle
+    private void DepartmanDegisti()
+    {
+        seciliPersonelId = null;
+        atamaMesaji = "";
+    }
+
+    // Atamayı kaydet
+    private async Task AtamayiKaydet()
+    {
+        if (!yonetici || seciliAriza == null || atamaKaydediliyor)
+            return;
+
+        atamaMesaji = "";
+
+        if (seciliDepartmanId == null)
+        {
+            atamaMesaji = "Lütfen departman seçiniz.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(seciliPersonelId))
+        {
+            atamaMesaji = "Lütfen personel seçiniz.";
+            return;
+        }
+
+        // Seçilen personelin gerçekten seçilen departmana ait
+        // olduğunu kontrol et.
+        if (!personeller.Any(p =>
+            p.Id == seciliPersonelId &&
+            p.DepartmanId == seciliDepartmanId))
+        {
+            atamaMesaji = "Seçilen personel bu departmana ait değil.";
+            return;
+        }
+
+        atamaKaydediliyor = true;
+
+        try
+        {
+            var sonuc = await ArizaService.ArizaAtaAsync(
+                seciliAriza.Id,
+                seciliDepartmanId,
+                seciliPersonelId
+            );
+
+            if (sonuc.Basarili)
+            {
+                basarili = true;
+                mesaj = sonuc.Mesaj;
+
+                atamaPenceresiAcik = false;
+
+                await ListeyiYukle();
+            }
+            else
+            {
+                atamaMesaji = sonuc.Mesaj;
+            }
+        }
+        catch
+        {
+            atamaMesaji = "Atama yapılırken bir hata oluştu.";
+        }
+        finally
+        {
+            atamaKaydediliyor = false;
+        }
+    }
+
+    // Atama penceresini kapat
+    private void AtamaEkraniniKapat()
+    {
+        atamaPenceresiAcik = false;
+        seciliAriza = null;
+        seciliDepartmanId = null;
+        seciliPersonelId = null;
+        atamaMesaji = "";
+    }
+
+    // Arıza düzenleme sayfasına git
+    private void Duzenle(Ariza ariza)
+    {
+        if (!IslemYapabilir(ariza))
+            return;
+
+        Navigation.NavigateTo($"/ariza-duzenle/{ariza.Id}");
+    }
+
+    // Arıza sil
+    private async Task Sil(Ariza ariza)
+    {
+        if (!IslemYapabilir(ariza))
+            return;
+
+        bool onay = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Bu arıza kaydını silmek istediğinize emin misiniz?"
+        );
+
+        if (!onay)
+            return;
+
+        try
+        {
+            var sonuc = await ArizaService.ArizaSilAsync(ariza.Id);
+
+            basarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+
+            if (sonuc.Basarili)
+            {
+                await ListeyiYukle();
+            }
+        }
+        catch
+        {
+            basarili = false;
+            mesaj = "Arıza kaydı silinirken bir hata oluştu.";
+        }
+    }
+}

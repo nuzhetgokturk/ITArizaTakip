@@ -1,0 +1,13 @@
+﻿
+@page "/"
+
+@inject NavigationManager Navigation
+
+<PageTitle>IT Arıza Takip Sistemi</PageTitle>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/giris");
+    }
+}

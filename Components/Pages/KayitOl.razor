@@ -1,0 +1,162 @@
+
+
+@page "/kayit-ol"
+
+@using Microsoft.AspNetCore.Identity
+@using ITArizaTakip.Data
+@using System.Linq
+
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Personel Kayıt</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow p-4">
+
+                <h3 class="text-center mb-4">Personel Kayıt</h3>
+
+                <div class="mb-3">
+                    <label class="form-label">Ad Soyad</label>
+                    <input class="form-control" @bind="model.AdSoyad" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Departman</label>
+                    <input class="form-control" @bind="model.Departman" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">E-posta</label>
+                    <input class="form-control"
+                           type="email"
+                           @bind="model.Email" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Şifre</label>
+                    <input class="form-control"
+                           type="password"
+                           @bind="model.Sifre" />
+                </div>
+
+                <button type="button"
+                        class="btn btn-primary w-100"
+                        @onclick="KullaniciKaydet"
+                        disabled="@kaydediliyor">
+                    @(kaydediliyor ? "Kaydediliyor..." : "Kayıt Ol")
+                </button>
+
+                @if (!string.IsNullOrWhiteSpace(mesaj))
+                {
+                    <div class="alert @(kayitBasarili ? "alert-success" : "alert-info") mt-3">
+                        @mesaj
+                    </div>
+                }
+
+                <div class="text-center mt-3">
+                    <a href="/giris">Giriş sayfasına dön</a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private KayitModel model = new();
+
+    private string mesaj = "";
+    private bool kaydediliyor = false;
+    private bool kayitBasarili = false;
+
+    private async Task KullaniciKaydet()
+    {
+        if (kaydediliyor)
+            return;
+
+        mesaj = "";
+        kayitBasarili = false;
+
+        if (string.IsNullOrWhiteSpace(model.AdSoyad) ||
+            string.IsNullOrWhiteSpace(model.Departman) ||
+            string.IsNullOrWhiteSpace(model.Email) ||
+            string.IsNullOrWhiteSpace(model.Sifre))
+        {
+            mesaj = "Lütfen bütün alanları doldurun.";
+            return;
+        }
+
+        if (model.Sifre.Length < 6)
+        {
+            mesaj = "Şifre en az 6 karakter olmalıdır.";
+            return;
+        }
+
+        kaydediliyor = true;
+
+        try
+        {
+            var email = model.Email.Trim();
+
+            var kullanici = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                AdSoyad = model.AdSoyad.Trim(),
+                Departman = model.Departman.Trim()
+            };
+
+            var sonuc = await UserManager.CreateAsync(
+                kullanici,
+                model.Sifre
+            );
+
+            if (!sonuc.Succeeded)
+            {
+                mesaj = string.Join(
+                    " ",
+                    sonuc.Errors.Select(x => x.Description)
+                );
+                return;
+            }
+
+            var rolSonucu = await UserManager.AddToRoleAsync(
+                kullanici,
+                "Personel"
+            );
+
+            if (!rolSonucu.Succeeded)
+            {
+                await UserManager.DeleteAsync(kullanici);
+
+                mesaj = "Personel rolü atanamadı. Kayıt geri alındı: " +
+                    string.Join(" ", rolSonucu.Errors.Select(x => x.Description));
+
+                return;
+            }
+
+            kayitBasarili = true;
+            mesaj = "Kayıt başarılı! Şimdi giriş yapabilirsiniz.";
+
+            model = new KayitModel();
+        }
+        catch
+        {
+            mesaj = "Kayıt sırasında beklenmeyen bir hata oluştu.";
+        }
+        finally
+        {
+            kaydediliyor = false;
+        }
+    }
+
+    public class KayitModel
+    {
+        public string AdSoyad { get; set; } = "";
+        public string Departman { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Sifre { get; set; } = "";
+    }
+}

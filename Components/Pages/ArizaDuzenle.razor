@@ -1,0 +1,191 @@
+
+@page "/ariza-duzenle/{id:int}"
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici,Personel")]
+
+@using ITArizaTakip.Data
+@using ITArizaTakip.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject ArizaService ArizaService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Arıza Düzenle</PageTitle>
+
+<h3>Arıza Düzenle</h3>
+
+@if (yukleniyor)
+{
+    <p>Arıza bilgileri yükleniyor...</p>
+}
+else if (ariza == null)
+{
+    <div class="alert alert-warning">
+        Arıza kaydı bulunamadı veya bu kayıt üzerinde işlem yapma yetkiniz yok.
+    </div>
+
+    <button class="btn btn-secondary" @onclick="ListeyeDon">
+        Geri Dön
+    </button>
+}
+else
+{
+    <div class="card p-4 shadow-sm">
+
+        @if (!string.IsNullOrWhiteSpace(mesaj))
+        {
+            <div class="alert @(basarili ? "alert-success" : "alert-danger")">
+                @mesaj
+            </div>
+        }
+
+        @if (yonetici)
+        {
+            <div class="mb-3">
+                <label class="form-label">Talep Eden</label>
+                <input class="form-control"
+                       @bind="ariza.TalepEden"
+                       maxlength="200" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Departman</label>
+                <input class="form-control"
+                       @bind="ariza.Departman"
+                       maxlength="100" />
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label">Talep Eden</label>
+                <input class="form-control"
+                       value="@ariza.TalepEden"
+                       disabled />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Departman</label>
+                <input class="form-control"
+                       value="@ariza.Departman"
+                       disabled />
+            </div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Arıza Başlığı</label>
+            <input class="form-control"
+                   @bind="ariza.ArizaBasligi"
+                   maxlength="150" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Açıklama</label>
+            <textarea class="form-control"
+                      @bind="ariza.Aciklama"
+                      maxlength="2000"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Öncelik</label>
+            <select class="form-select" @bind="ariza.Oncelik">
+                <option value="Düşük">Düşük</option>
+                <option value="Orta">Orta</option>
+                <option value="Yüksek">Yüksek</option>
+            </select>
+        </div>
+
+        <button class="btn btn-success"
+                @onclick="Guncelle"
+                disabled="@kaydediliyor">
+            @(kaydediliyor ? "Kaydediliyor..." : "Değişiklikleri Kaydet")
+        </button>
+
+        <button class="btn btn-secondary ms-2"
+                @onclick="ListeyeDon"
+                disabled="@kaydediliyor">
+            Geri Dön
+        </button>
+
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+
+    private Ariza? ariza;
+    private bool yukleniyor = true;
+    private bool kaydediliyor = false;
+    private bool basarili = false;
+    private bool yonetici = false;
+    private string mesaj = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var durum = await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+            yonetici = durum.User.IsInRole("Yönetici");
+
+            // ArızaService, kullanıcının bu kayıt üzerinde
+            // işlem yapma yetkisini ayrıca kontrol eder.
+            ariza = await ArizaService.ArizaGetirAsync(id);
+        }
+        catch
+        {
+            mesaj = "Arıza bilgileri yüklenirken bir hata oluştu.";
+        }
+        finally
+        {
+            yukleniyor = false;
+        }
+    }
+
+    private async Task Guncelle()
+    {
+        if (ariza == null || kaydediliyor)
+            return;
+
+        kaydediliyor = true;
+        mesaj = "";
+
+        try
+        {
+            var sonuc = await ArizaService.ArizaGuncelleAsync(
+                id,
+                ariza.TalepEden,
+                ariza.Departman,
+                ariza.ArizaBasligi,
+                ariza.Aciklama,
+                ariza.Oncelik
+            );
+
+            basarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+
+            if (sonuc.Basarili)
+            {
+                await Task.Delay(700);
+                Navigation.NavigateTo("/ariza-listesi");
+            }
+        }
+        catch
+        {
+            basarili = false;
+            mesaj = "Güncelleme sırasında bir hata oluştu.";
+        }
+        finally
+        {
+            kaydediliyor = false;
+        }
+    }
+
+    private void ListeyeDon()
+    {
+        Navigation.NavigateTo("/ariza-listesi");
+    }
+}

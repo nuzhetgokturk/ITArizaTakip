@@ -1,0 +1,99 @@
+﻿
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/dashboard">
+            IT ARIZA TAKİP
+        </a>
+    </div>
+</div>
+
+<div class="nav-scrollable">
+    <nav class="nav flex-column">
+
+        <AuthorizeView Roles="Yönetici,Personel">
+            <Authorized Context="kullanici">
+
+                <div class="nav-item px-3 mt-3 mb-3">
+                    <strong class="text-white">Hoş Geldiniz</strong>
+
+                    <div>
+                        @if (kullanici.User.IsInRole("Yönetici"))
+                        {
+                            <span class="badge bg-danger mt-2">
+                                Yönetici
+                            </span>
+                        }
+                        else if (kullanici.User.IsInRole("Personel"))
+                        {
+                            <span class="badge bg-primary mt-2">
+                                Personel
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <div class="nav-item px-3 mb-3">
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn btn-danger w-100">
+                            Çıkış Yap
+                        </button>
+                    </form>
+                </div>
+
+                @if (kullanici.User.IsInRole("Yönetici"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/dashboard">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Yönetim Paneli
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/personel-yonetimi">
+                            <i class="bi bi-people me-2"></i>
+                            Personel Yönetimi
+                        </NavLink>
+                    </div>
+                }
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/ariza-kayit">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Yeni Arıza Kaydı
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/ariza-listesi">
+                        <i class="bi bi-list-ul me-2"></i>
+                        Arıza Listesi
+                    </NavLink>
+                </div>
+
+                @if (kullanici.User.IsInRole("Yönetici"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/raporlama">
+                            <i class="bi bi-bar-chart me-2"></i>
+                            Raporlama
+                        </NavLink>
+                    </div>
+                }
+
+            </Authorized>
+
+            <NotAuthorized Context="yetkisiz">
+                <div class="nav-item px-3 mt-3">
+                    <a class="nav-link" href="/giris">
+                        Giriş Yap
+                    </a>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+
+    </nav>
+</div>

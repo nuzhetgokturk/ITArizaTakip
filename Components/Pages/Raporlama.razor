@@ -1,0 +1,326 @@
+
+@page "/raporlama"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici")]
+
+@using ITArizaTakip.Services
+
+@inject RaporlamaService RaporlamaService
+
+<PageTitle>Raporlama</PageTitle>
+
+<h3 class="mb-4">IT Arıza Raporlama</h3>
+
+@if (yukleniyor)
+{
+    <p>Raporlar yükleniyor...</p>
+}
+else if (!string.IsNullOrWhiteSpace(hataMesaji))
+{
+    <div class="alert alert-danger">
+        @hataMesaji
+    </div>
+}
+else if (rapor == null)
+{
+    <p>Rapor verileri alınamadı.</p>
+}
+else
+{
+    <h5 class="mb-3">Genel Arıza Özeti</h5>
+
+    <div class="row g-3">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-primary">
+                <h6>Toplam Arıza</h6>
+                <h2>@rapor.ToplamAriza</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-warning">
+                <h6>Bekleyen</h6>
+                <h2>@rapor.BekleyenAriza</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-info">
+                <h6>İşlemde</h6>
+                <h2>@rapor.IslemdeAriza</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-success">
+                <h6>Çözüldü</h6>
+                <h2>@rapor.CozulduAriza</h2>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Öncelik Dağılımı</h5>
+
+        <p>Yüksek Öncelik: <strong>@rapor.YuksekOncelik</strong></p>
+        <p>Orta Öncelik: <strong>@rapor.OrtaOncelik</strong></p>
+        <p>Düşük Öncelik: <strong>@rapor.DusukOncelik</strong></p>
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Departmanlara Göre Arıza Dağılımı</h5>
+
+        @foreach (var departman in rapor.DepartmanRaporu)
+        {
+            <p>
+                @departman.Departman:
+                <strong>@departman.Sayi</strong> arıza
+            </p>
+        }
+
+        @if (rapor.DepartmanRaporu.Count == 0)
+        {
+            <p>Henüz raporlanacak kayıt bulunmuyor.</p>
+        }
+    </div>
+
+    <hr class="my-4" />
+
+    <h4 class="mb-3">Arıza Atama Raporları</h4>
+
+    <div class="row g-3">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-primary">
+                <h6>Departmana Atanan</h6>
+                <h2>@rapor.AtananDepartmanSayisi</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-success">
+                <h6>Personele Atanan</h6>
+                <h2>@rapor.AtananPersonelSayisi</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-warning">
+                <h6>Departman Ataması Bekleyen</h6>
+                <h2>@rapor.AtanmamisDepartmanSayisi</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3 border-danger">
+                <h6>Personel Ataması Bekleyen</h6>
+                <h2>@rapor.AtanmamisPersonelSayisi</h2>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Departmanlara Göre Atama İstatistikleri</h5>
+
+        @if (rapor.AtamaDepartmanRaporu.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Departman</th>
+                            <th>Toplam Atama</th>
+                            <th>Bekleyen</th>
+                            <th>İşlemde</th>
+                            <th>Çözüldü</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in rapor.AtamaDepartmanRaporu)
+                        {
+                            <tr>
+                                <td>@item.Departman</td>
+                                <td>@item.Sayi</td>
+                                <td>@item.Bekleyen</td>
+                                <td>@item.Islemde</td>
+                                <td>@item.Cozuldu</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p>Henüz departman ataması bulunmuyor.</p>
+        }
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Personele Göre Atama İstatistikleri</h5>
+
+        @if (rapor.PersonelAtamaRaporu.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Personel</th>
+                            <th>Toplam Atama</th>
+                            <th>Bekleyen</th>
+                            <th>İşlemde</th>
+                            <th>Çözüldü</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in rapor.PersonelAtamaRaporu)
+                        {
+                            <tr>
+                                <td>@item.PersonelAdi</td>
+                                <td>@item.Sayi</td>
+                                <td>@item.Bekleyen</td>
+                                <td>@item.Islemde</td>
+                                <td>@item.Cozuldu</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p>Henüz personel ataması bulunmuyor.</p>
+        }
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Atama Yapılmamış Arızalar</h5>
+
+        @{
+            var atanmamislar = rapor.AtamaDetaylari
+                .Where(a => a.Departman == "Atanmadı" ||
+                            a.Personel == "Atanmadı")
+                .ToList();
+        }
+
+        @if (atanmamislar.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Arıza No</th>
+                            <th>Arıza Başlığı</th>
+                            <th>Talep Eden</th>
+                            <th>Departman</th>
+                            <th>Personel</th>
+                            <th>Öncelik</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in atanmamislar)
+                        {
+                            <tr>
+                                <td>@item.ArizaId</td>
+                                <td>@item.ArizaBasligi</td>
+                                <td>@item.TalepEden</td>
+                                <td>@item.Departman</td>
+                                <td>@item.Personel</td>
+                                <td>@item.Oncelik</td>
+                                <td>@item.Durum</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p>Atama bekleyen arıza bulunmuyor.</p>
+        }
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4">
+        <h5>Tüm Arızaların Ayrıntılı Atama Listesi</h5>
+
+        @if (rapor.AtamaDetaylari.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Arıza No</th>
+                            <th>Arıza Başlığı</th>
+                            <th>Talep Eden</th>
+                            <th>Atanan Departman</th>
+                            <th>Atanan Personel</th>
+                            <th>Öncelik</th>
+                            <th>Durum</th>
+                            <th>Kayıt Tarihi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in rapor.AtamaDetaylari)
+                        {
+                            <tr>
+                                <td>@item.ArizaId</td>
+                                <td>@item.ArizaBasligi</td>
+                                <td>@item.TalepEden</td>
+                                <td>@item.Departman</td>
+                                <td>@item.Personel</td>
+                                <td>@item.Oncelik</td>
+                                <td>@item.Durum</td>
+                                <td>@item.KayitTarihi.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p>Henüz arıza kaydı bulunmuyor.</p>
+        }
+    </div>
+
+    <div class="card shadow-sm p-4 mt-4 border-primary">
+        <h5>Yazılı Rapor ve Genel Değerlendirme</h5>
+
+        <p class="text-muted">
+            Sistemdeki arıza ve atama kayıtları analiz edilerek oluşturulan genel değerlendirme:
+        </p>
+
+        <div class="alert alert-light border mb-0">
+            @rapor.YaziliDegerlendirme
+        </div>
+    </div>
+}
+
+@code {
+    private RaporlamaOzet? rapor;
+    private bool yukleniyor = true;
+    private string? hataMesaji;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            rapor = await RaporlamaService.RaporlariGetirAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            hataMesaji = "Bu raporları görüntüleme yetkiniz yok.";
+        }
+        catch (Exception)
+        {
+            hataMesaji = "Raporlar yüklenirken bir hata oluştu.";
+        }
+        finally
+        {
+            yukleniyor = false;
+        }
+    }
+}

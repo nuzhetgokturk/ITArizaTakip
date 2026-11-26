@@ -1,0 +1,266 @@
+
+@page "/dashboard"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Yönetici,Personel")]
+
+@using ITArizaTakip.Services
+
+@inject DashboardService DashboardService
+
+<PageTitle>Yönetim Paneli</PageTitle>
+
+<h3 class="dashboard-title">IT Arıza Takip Yönetim Paneli</h3>
+<p class="dashboard-subtitle">Arıza durumlarını ve genel istatistikleri takip edin.</p>
+
+@if (yukleniyor)
+{
+    <div class="dashboard-loading">İstatistikler yükleniyor...</div>
+}
+else
+{
+    <div class="row g-4">
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card stat-total">
+                <div class="stat-icon">📊</div>
+                <div class="stat-label">Toplam Arıza</div>
+                <div class="stat-number">@ozet.ToplamAriza</div>
+                <div class="stat-description">Tüm arıza kayıtları</div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card stat-pending">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-label">Bekleyen</div>
+                <div class="stat-number">@ozet.BekleyenAriza</div>
+                <div class="stat-description">İşlem bekleyen kayıtlar</div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card stat-progress">
+                <div class="stat-icon">⚙️</div>
+                <div class="stat-label">İşlemde</div>
+                <div class="stat-number">@ozet.IslemdeAriza</div>
+                <div class="stat-description">Üzerinde çalışılan kayıtlar</div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card stat-completed">
+                <div class="stat-icon">✓</div>
+                <div class="stat-label">Çözüldü</div>
+                <div class="stat-number">@ozet.CozulduAriza</div>
+                <div class="stat-description">Tamamlanan kayıtlar</div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="priority-card mt-4">
+        <h5 class="priority-title">Arıza Öncelik Dağılımı</h5>
+        <p class="priority-subtitle">Kayıtların öncelik seviyelerine göre dağılımı</p>
+
+        <div class="priority-item">
+            <div class="priority-heading">
+                <span>Yüksek Öncelik</span>
+                <strong>@ozet.YuksekOncelik</strong>
+            </div>
+            <div class="priority-track">
+                <div class="priority-fill priority-high"
+                     style="width: @(YuzdeHesapla(ozet.YuksekOncelik))%">
+                </div>
+            </div>
+        </div>
+
+        <div class="priority-item">
+            <div class="priority-heading">
+                <span>Orta Öncelik</span>
+                <strong>@ozet.OrtaOncelik</strong>
+            </div>
+            <div class="priority-track">
+                <div class="priority-fill priority-medium"
+                     style="width: @(YuzdeHesapla(ozet.OrtaOncelik))%">
+                </div>
+            </div>
+        </div>
+
+        <div class="priority-item">
+            <div class="priority-heading">
+                <span>Düşük Öncelik</span>
+                <strong>@ozet.DusukOncelik</strong>
+            </div>
+            <div class="priority-track">
+                <div class="priority-fill priority-low"
+                     style="width: @(YuzdeHesapla(ozet.DusukOncelik))%">
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .dashboard-title {
+        color: #172d50;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .dashboard-subtitle {
+        color: #64748b;
+        margin-bottom: 28px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 14px;
+        padding: 24px;
+        min-height: 180px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
+        border: 1px solid #e8edf4;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 9px 22px rgba(15, 23, 42, 0.09);
+    }
+
+    .stat-icon {
+        font-size: 25px;
+        margin-bottom: 15px;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .stat-number {
+        font-size: 34px;
+        font-weight: 750;
+        color: #172d50;
+        margin-top: 5px;
+    }
+
+    .stat-description {
+        color: #94a3b8;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+
+    .stat-total {
+        border-top: 4px solid #2563eb;
+    }
+
+    .stat-pending {
+        border-top: 4px solid #f59e0b;
+    }
+
+    .stat-progress {
+        border-top: 4px solid #0ea5e9;
+    }
+
+    .stat-completed {
+        border-top: 4px solid #16a34a;
+    }
+
+    .priority-card {
+        background: white;
+        border: 1px solid #e8edf4;
+        border-radius: 14px;
+        padding: 28px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
+    }
+
+    .priority-title {
+        color: #172d50;
+        font-weight: 700;
+    }
+
+    .priority-subtitle {
+        color: #94a3b8;
+        font-size: 13px;
+        margin-bottom: 28px;
+    }
+
+    .priority-item {
+        margin-bottom: 24px;
+    }
+
+    .priority-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .priority-heading {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 9px;
+        color: #475569;
+        font-size: 14px;
+    }
+
+    .priority-heading strong {
+        color: #172d50;
+    }
+
+    .priority-track {
+        height: 12px;
+        background: #edf1f6;
+        border-radius: 20px;
+        overflow: hidden;
+    }
+
+    .priority-fill {
+        height: 100%;
+        border-radius: 20px;
+        transition: width 0.4s ease;
+    }
+
+    .priority-high {
+        background: #ef4444;
+    }
+
+    .priority-medium {
+        background: #f59e0b;
+    }
+
+    .priority-low {
+        background: #16a34a;
+    }
+
+    .dashboard-loading {
+        padding: 30px;
+        color: #64748b;
+    }
+</style>
+
+@code {
+    private DashboardOzet ozet = new();
+    private bool yukleniyor = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            ozet = await DashboardService.OzetGetirAsync();
+        }
+        catch
+        {
+            ozet = new DashboardOzet();
+        }
+        finally
+        {
+            yukleniyor = false;
+        }
+    }
+
+    private double YuzdeHesapla(int sayi)
+    {
+        if (ozet.ToplamAriza == 0)
+            return 0;
+
+        return (double)sayi / ozet.ToplamAriza * 100;
+    }
+}

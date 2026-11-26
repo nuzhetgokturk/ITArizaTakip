@@ -1,0 +1,180 @@
+
+@page "/ariza-kayit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using ITArizaTakip.Data
+@using ITArizaTakip.Services
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@inject ArizaService ArizaService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Arıza Kaydı</PageTitle>
+
+<h3>IT Arıza Kayıt Formu</h3>
+
+<div class="card p-4 shadow-sm">
+
+    @if (!hazir)
+    {
+        <p>
+            @(string.IsNullOrWhiteSpace(mesaj)
+                ? "Kullanıcı bilgileri yükleniyor..."
+                : mesaj)
+        </p>
+    }
+    else
+    {
+        <div class="mb-3">
+            <label class="form-label">Talep Eden</label>
+            <input class="form-control" value="@kullaniciAdi" disabled />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Departman</label>
+            <input class="form-control" value="@departman" disabled />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Arıza Başlığı</label>
+            <input class="form-control" @bind="ariza.ArizaBasligi" maxlength="150" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Açıklama</label>
+            <textarea class="form-control" rows="4"
+                      @bind="ariza.Aciklama" maxlength="2000"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Öncelik</label>
+            <select class="form-select" @bind="ariza.Oncelik">
+                <option value="Düşük">Düşük</option>
+                <option value="Orta">Orta</option>
+                <option value="Yüksek">Yüksek</option>
+            </select>
+        </div>
+
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="Kaydet"
+                disabled="@kaydediliyor">
+            @(kaydediliyor ? "Kaydediliyor..." : "Arıza Kaydet")
+        </button>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(mesaj) && hazir)
+    {
+        <div class="alert @(basarili ? "alert-success" : "alert-danger") mt-3">
+            @mesaj
+        </div>
+    }
+
+</div>
+
+@code {
+    private Ariza ariza = new();
+
+    private string mesaj = "";
+    private string kullaniciAdi = "";
+    private string departman = "";
+
+    private bool hazir = false;
+    private bool kaydediliyor = false;
+    private bool basarili = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var durum = await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+            var kullanici = durum.User;
+
+            if (kullanici.Identity?.IsAuthenticated != true)
+            {
+                mesaj = "Oturum bilgisi bulunamadı.";
+                return;
+            }
+
+            var id = kullanici.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                mesaj = "Kullanıcı kimliği bulunamadı.";
+                return;
+            }
+
+            var hesap = await UserManager.FindByIdAsync(id);
+
+            if (hesap == null)
+            {
+                mesaj = "Kullanıcı hesabı bulunamadı.";
+                return;
+            }
+
+            kullaniciAdi = hesap.AdSoyad;
+            departman = hesap.Departman;
+
+            hazir = true;
+        }
+        catch
+        {
+            mesaj = "Kullanıcı bilgileri yüklenirken hata oluştu.";
+        }
+    }
+
+    private async Task Kaydet()
+    {
+        if (!hazir || kaydediliyor)
+            return;
+
+        if (string.IsNullOrWhiteSpace(ariza.ArizaBasligi))
+        {
+            basarili = false;
+            mesaj = "Arıza başlığı zorunludur.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ariza.Aciklama))
+        {
+            basarili = false;
+            mesaj = "Arıza açıklaması zorunludur.";
+            return;
+        }
+
+        kaydediliyor = true;
+        mesaj = "";
+
+        try
+        {
+            var sonuc = await ArizaService.ArizaOlusturAsync(
+                ariza.ArizaBasligi,
+                ariza.Aciklama,
+                ariza.Oncelik
+            );
+
+            basarili = sonuc.Basarili;
+            mesaj = sonuc.Mesaj;
+
+            if (sonuc.Basarili)
+            {
+                ariza = new Ariza();
+            }
+        }
+        catch
+        {
+            basarili = false;
+            mesaj = "Arıza kaydedilirken bir hata oluştu.";
+        }
+        finally
+        {
+            kaydediliyor = false;
+        }
+    }
+}
